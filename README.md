@@ -1,4 +1,4 @@
-# Proyects Trading
+# Projects Trading
 
 ## Authors
 - Carlos Alfredo Bautista
