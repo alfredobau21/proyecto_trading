@@ -1,1 +1,8 @@
-# proyecto_trading
+# Proyects Trading
+
+## Authors
+- Carlos Alfredo Bautista
+- Eduardo Gutierrez
+- Alejandro Frizard
+- Jose Carlos Lopez
+- Manuel Reyna
