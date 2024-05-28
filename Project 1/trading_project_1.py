@@ -14,3 +14,5 @@ warnings.filterwarnings('ignore')
 import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import lognorm
+
+x = 'hola soy manureymon'
