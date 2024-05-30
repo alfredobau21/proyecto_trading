@@ -95,3 +95,4 @@ plt.title('Expected Revenues')
 plt.xlabel('Spread')
 plt.ylabel('Revenue')
 plt.grid(True)
+
