@@ -1,1 +1,3 @@
-Project 1
+# Information Effects on the Bid-Ask Spread
+
+This project explores the information effects on the bid-ask spread. Building on the contributions of Bagehot ("The Only Game in Town") and the model by Copeland & Galai ("Information Effects on the Bid-Ask Spread"), we demonstrate how a spread can exist even in the absence of transaction costs. By analyzing these models, we aim to maximize the market maker's profit function with respect to the bid and ask prices. This research is crucial as it helps us understand the underlying factors influencing the bid-ask spread and provides insights into the behavior of market makers in financial markets.
