@@ -8,7 +8,7 @@ This project explores the information effects on the bid-ask spread. Building on
    - Distribution: $P \sim \text{Weibull}(\lambda = 50, k = 10)$
    - Stock Price: $51$
 
-2. **Probability of an Informed Trade:**
+2. **Probability of an Informed Trader:**
    - $\Pi_I = 0.4$
    - This represents the probability that a trade is informed, set at $40\%$.
 
@@ -21,3 +21,17 @@ This project explores the information effects on the bid-ask spread. Building on
    - $\Pi_{LS}(S) = 0.5 - 0.08S$
    - Constraints: $\Pi_{LS} \in [0, 0.5]$
    - Description: Defines $\Pi_{LS}$, the probability of a sell limit, as a linear function of $S$, where $S = (S_0 - B)$, $S_0$ is the initial stock price, and $B$ is the bid price.
+
+## Deliverables
+**Plot 1**
+- The price distribution
+
+
+**Plot 2**
+- Expected revenue if all trades are liquidity trades
+- Expected revenue if there is a 40% chance that an informed trade will be executed, keep the same liquidity probabilities as the previous point.
+- Expected revenue considering de probability of an Informed Trader, Limit Probability ($\Pi_{LB}$) and ($\Pi_{LS}$)
+
+
+**Plot 3**
+- Determine the optimal Bid / Ask price using Copeland & Galai's model.
