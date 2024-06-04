@@ -1,0 +1,6 @@
+Python==3.11
+pandas
+matplotlib
+ta
+itertools
+optuna
