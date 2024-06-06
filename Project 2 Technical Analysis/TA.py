@@ -180,8 +180,73 @@ def check_close_operations(row, cash, operations, com):
     return cash, operations
 
 # check de value of the trade
-def calculate_operation_value[operation, cp]: # cp = current price
+def calculate_operation_value(operation, cp): # cp = current price
     if operation["operation_type"] == "long":
         return operation["n_shares"] * cp
     else: # short
         return (2 * operation["bought_at"] - cp) * operation["n_shares"]
+
+# graphs
+def plot_results(strategy_value, data):
+    plt.figure(figsize=(12,8))
+    plt.plot(data["Date"], strategy_value[1:], label="Value of the Strategy")
+    plt.xlabel("Date")
+    plt.ylabel("Value")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
+# do combinations of indicators
+def combinatinos(data, n, indicators, cash):
+    best_result = 0
+    best_combination = None
+    all_indicators = list(indicators.keys())
+    combinations_of_indicators = combinations(all_indicators, n)
+
+    for combination in combinations_of_indicators:
+        active_indicators = list(combination)
+        strategy_value = execute_trades(data, active_indicators, best_combination, cash)
+        result = strategy_value[-1]
+
+        if result > best_result:
+            best_result = result
+            best_combination = combination
+
+    return  best_combination, best_result
+
+# new strategy
+def reset_strategy(data, initial_cash=1_000_000):
+    active_indicators = []
+    operations = []
+    cash = initial_cash
+    strategy_value = [cash]
+    return active_indicators, cash, operations, strategy_value
+
+# optimize
+def optimize_parameters(data, indicators, n_trails=200, initial_cash=1_000_000):
+    def objective(trail):
+        active_indicators = []
+        for indicator_name in indicators.keys():
+            if trail.suggest_categorical(indicator_name, [True, False]):
+                active_indicators.append(indicator_name)
+        strategy_value = execute_trades(data, active_indicators, cash=initial_cash)
+        return strategy_value[-1]
+
+    study = optuna.create_study(direction="maximize")
+    study.optimize(objective, n_trails=n_trails)
+    best_indicators = [indicator for indicator in indicators.keys() if study.best_params[indicator]]
+    return best_indicators, study.best_value
+
+# Let's try it!
+def test_strategy(data, indicators, best_combination, cash):
+    strategy_value = execute_trades(data, indicators, best_combination, cash)
+    return strategy_value
+
+# How we do?
+def calculate_performance(data_path, cash=1_000_000):
+    data = pd.read_csv(data_path)
+    data["Date"] = pd.to_datetime(data["Date"])
+    first_close = data.iloc[0]["Close"]
+    last_close = data.iloc[-1]["Close"]
+    rend_p = (last_close - first_close) / first_close * 100
+    return rend_p
