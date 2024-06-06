@@ -180,7 +180,7 @@ def check_close_operations(row, cash, operations, com):
     return cash, operations
 
 # check de value of the trade
-def calculate_operation_value[operation, cp]:
+def calculate_operation_value[operation, cp]: # cp = current price
     if operation["operation_type"] == "long":
         return operation["n_shares"] * cp
     else: # short
