@@ -129,5 +129,59 @@ def execute_trades(data, active_indicators, best_combination=None, cash=1_000_00
             data["total_sell_signals"] = data[[indicator + "_sell_signal" for indicator in active_indicators]].sum(axis=1)
         total_active_indicators = len(active_indicators)
 
-#*****
-    for i,row
+    for i, row in data.iterrows():
+        if total_active_indicators <=2:
+            if data.total_buys_signals.iloc[i] == total_active_indicators:
+                cash, operations = open_operation("long", row, cash, com, n_shares, operations)
+            elif data.total_sell_signals.iloc[i] == total_active_indicators:
+                cash, operations = open_operation("short", row, cash, com, n_shares, operations)
+        else:
+            if data.total_buys_signals.iloc[i] > (total_active_indicators / 2):
+                cash, operations = open_operation("long", row, cash, com, n_shares, operations)
+            elif data.total_sell_signals.iloc[i] > (total_active_indicators / 2):
+                cash, operations = open_operation("short", row, cash, com, n_shares, operations)
+
+        cash, operations = check_close_operations(row, cash, operations, com)
+        total_value = cash + sum(calculate_operation_value(op, row["Close"]) for op in operations if not op["closed"])
+        strategy_value.append(total_value)
+
+    return strategy_value
+
+# when we have an open operation
+def open_operation(operation_type, row, cash, com, n_shares, operations):
+    if operation_type == "long":
+        stop_loss = row["Close"] * 0.85
+        take_profit = row["Close"] * 1.10
+    else: # short
+        stop_loss = row["Close"] * 1.10
+        take_profit = row["Close"] * 0.85
+
+    operations.append({"operation_type": operation_type, "bought_at": row["Close"], "timestamp": row.name, "n_shares": n_shares, "stop_loss": stop_loss, "take_profit": take_profit, "closed": False})
+    if operation_type == "long":
+        cash -= row["Close"] * n_shares * (1 + com)
+    else: # short
+        cash += row["Close"] * n_shares * (1 - com) # we get chash for a short position
+
+    return cash, operations
+
+# see if we close the operations or not, depending on our SL and TP
+def check_close_operations(row, cash, operations, com):
+    for operation in operations:
+        if not operation["closed"]:
+            if operation["operation_type"] == "long":
+                if row["Close"] <= operation["stop_loss"] or row["Close"] >= operation["take_profit"]:
+                    operation["closed"] = True
+                    cash += row["Close"] * operation["n_shares"] * (1 - com)
+            elif operation["operation_type"] == "short":
+                if row["Close"] >= operation["stop_loss"] or row["Close"] <= operation["take_profit"]:
+                    operation["closed"] = True
+                    cash -= row["Close"] * operation["n_shares"] * (1 + com)
+
+    return cash, operations
+
+# check de value of the trade
+def calculate_operation_value[operation, cp]:
+    if operation["operation_type"] == "long":
+        return operation["n_shares"] * cp
+    else: # short
+        return (2 * operation["bought_at"] - cp) * operation["n_shares"]
