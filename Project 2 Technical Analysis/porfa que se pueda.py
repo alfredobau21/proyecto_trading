@@ -85,12 +85,40 @@ class TradingStrategy:
         active_positions = []
         portfolio_value = [capital]
 
+        # RSI
+        rsi_window = trial.suggest_int('rsi_window', 5, 30)
+        rsi_lower_threshold = trial.suggest_int("rsi_lower_threshold", 10, 30)
+
+        # Boolinger
+        bollinger_window = trial.suggest_int('bollinger_window', 10, 50)
+
+        # MAACD
+        macd_fast = trial.suggest_int('macd_fast', 10, 20)
+        macd_slow = trial.suggest_int('macd_slow', 21, 40)
+        macd_sign = trial.suggest_int('macd_sign', 5, 15)
+
+        # Stoch
+        stoch_k_window = trial.suggest_int('stoch_k_window', 5, 21)
+        stoch_d_window = trial.suggest_int('stoch_d_window', 3, 14)
+        stoch_smoothing = trial.suggest_int('stoch_smoothing', 3, 14)
+
+        # SMA
+        short_ma_window = trial.suggest_int('short_ma_window', 5, 20)
+        long_ma_window = trial.suggest_int('long_ma_window', 21, 50)
+
         technical_data = self.create_signals(self.data,
-            RSI=self.best_params.get('RSI', (14,)) if self.best_params else (14,),
-            Bollinger=self.best_params.get('Bollinger', (20, 2)) if self.best_params else (20, 2),
-            MACD=self.best_params.get('MACD', (12, 26, 9)) if self.best_params else (12, 26, 9),
-            Stochastic=self.best_params.get('Stochastic', (14, 3, 0)) if self.best_params else (14, 3, 0),
-            SMA=self.best_params.get('SMA', (30,)) if self.best_params else (30,)
+                                        rsi_window=rsi_window,
+                                        rsi_lower_threshold=rsi_lower_threshold,
+                                        bollinger_window=bollinger_window,
+                                        bollinger_std=2,
+                                        macd_fast=macd_fast,
+                                        macd_slow=macd_slow,
+                                        macd_sign=macd_sign,
+                                        stoch_k_window=stoch_k_window,
+                                        stoch_d_window=stoch_d_window,
+                                        stoch_smoothing=stoch_smoothing,
+                                        short_ma_window=short_ma_window,
+                                        long_ma_window=long_ma_window,
         )
 
         for i, row in technical_data.iterrows():
