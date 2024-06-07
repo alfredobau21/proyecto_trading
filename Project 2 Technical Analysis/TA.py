@@ -4,6 +4,7 @@ import ta
 from itertools import combinations
 import optuna
 
+
 # load training data
 def load_train(file):
     file_mapping = {
@@ -18,9 +19,9 @@ def load_train(file):
     data = pd.read_csv(file_name).dropna()
     return data
 
+
 # get indicators
 def calc_indicators(data):
-
     rsi_indicator = ta.momentum.RSIIndicator(close=data["Close"], window=15)
     data["RSI"] = rsi_indicator.rsi()
 
@@ -32,7 +33,8 @@ def calc_indicators(data):
     data["MACD"] = macd.macd()
     data["Signal_Line"] = macd.macd_signal()
 
-    stoch_indicator = ta.momentum.StochasticOscillator(high=data["High"], low=data["Low"], close=data["Close"], window=15, smooth_window=5)
+    stoch_indicator = ta.momentum.StochasticOscillator(high=data["High"], low=data["Low"], close=data["Close"],
+                                                       window=15, smooth_window=5)
     data["stoch_%K"] = stoch_indicator.stoch()
     data["stoch_%D"] = stoch_indicator.stoch_signal()
 
@@ -45,18 +47,22 @@ def calc_indicators(data):
     data.reset_index(drop=True, inplace=True)
     return data
 
+
 # create signals
-def buy_sell_signals(data):
-    indicators = {
-        "RSI": {"buy": rsi_buy_signal, "sell":rsi_sell_signal},
-        "BOL": {"buy": bol_buy_signal, "sell":bol_sell_signal},
-        "MACD": {"buy": macd_buy_signal, "sell": macd_sell_signal},
-        "STOCH": {"buy": stoch_buy_signal, "sell": stoch_sell_signal},
-        "SMA": {"buy": sma_buy_signal, "sell": sma_sell_signal}
-    }
+def buy_sell_signals(data, indicators):
+    # indicators = {
+    #     "RSI": {"buy": rsi_buy_signal, "sell": rsi_sell_signal},
+    #     "BOL": {"buy": bol_buy_signal, "sell": bol_sell_signal},
+    #     "MACD": {"buy": macd_buy_signal, "sell": macd_sell_signal},
+    #     "STOCH": {"buy": stoch_buy_signal, "sell": stoch_sell_signal},
+    #     "SMA": {"buy": sma_buy_signal, "sell": sma_sell_signal}
+    # }
+
     for indicator in indicators.keys():
-        data[indicator + '_buy_signal'] = data.apply(lambda row: indicators[indicator]['buy'](row, data.iloc[row.name - 1] if row.name > 0 else None), axis=1)
-        data[indicator + '_sell_signal'] = data.apply(lambda row: indicators[indicator]['sell'](row, data.iloc[row.name - 1] if row.name > 0 else None), axis=1)
+        data[indicator + '_buy_signal'] = data.apply(
+            lambda row: indicators[indicator]['buy'](row, data.iloc[row.name - 1] if row.name > 0 else None), axis=1)
+        data[indicator + '_sell_signal'] = data.apply(
+            lambda row: indicators[indicator]['sell'](row, data.iloc[row.name - 1] if row.name > 0 else None), axis=1)
 
     for indicator in indicators.keys():
         data[indicator + '_buy_signal'] = data[indicator + '_buy_signal'].astype(int)
@@ -64,25 +70,31 @@ def buy_sell_signals(data):
 
     return data, indicators
 
+
 # activate de indicators
 def active(active_indicators, indicator_name):
     if indicator_name in active_indicators:
         active_indicators.append(indicator_name)
     return active_indicators
 
-# RSI SIGNALS
-def rsi_buy_signal(row, prev_row=None):
-    return row.RSI < 20
 
-def rsi_sell_signal(row, prev_row=None):
-    return row.RSI > 80
+# RSI SIGNALS
+def rsi_buy_signal(row, value, prev_row=None):
+    return row.RSI < value
+
+
+def rsi_sell_signal(row, value, prev_row=None):
+    return row.RSI > value
+
 
 # BOL SIGNALS
 def bol_buy_signal(row, prev_row=None):
     return row["Close"] < row["Bollinger_Low"]
 
+
 def bol_sell_signal(row, prev_row=None):
     return row["Close"] > row["Bollinger_High"]
+
 
 # MACD SIGNALS
 def macd_buy_signal(row, prev_row=None):
@@ -90,38 +102,49 @@ def macd_buy_signal(row, prev_row=None):
         return row.MACD > row.Signal_Line and prev_row.MACD < prev_row.Signal_Line
     return False
 
+
 def macd_sell_signal(row, prev_row=None):
     if prev_row is not None:
         return row.MACD < row.Signal_Line and prev_row.MACD > prev_row.Signal_Line
     return False
 
+
 # STOCH SIGNALS
 def stoch_buy_signal(row, prev_row=None):
-    return prev_row is not None and prev_row["stoch_%K"] < prev_row["stoch_%D"] and row["stoch_%K"] > row["stoch_%D"] and row["stoch_%K"] < 20
+    return prev_row is not None and prev_row["stoch_%K"] < prev_row["stoch_%D"] and row["stoch_%K"] > row[
+        "stoch_%D"] and row["stoch_%K"] < 20
+
 
 def stoch_sell_signal(row, prev_row=None):
-    return prev_row is not None and prev_row["stoch_%K"] > prev_row["stoch_%D"] and row["stoch_%K"] < row["stoch_%D"] and row["stoch_%K"] > 80
+    return prev_row is not None and prev_row["stoch_%K"] > prev_row["stoch_%D"] and row["stoch_%K"] < row[
+        "stoch_%D"] and row["stoch_%K"] > 80
+
 
 # SMA SIGNALS
 def sma_buy_signal(row, prev_row=None):
     return prev_row is not None and prev_row["Long_SMA"] > prev_row["Short_SMA"] and row["Long_SMA"] < row["Short_SMA"]
 
+
 def sma_sell_signal(row, prev_row=None):
     return prev_row is not None and prev_row["Long_SMA"] < prev_row["Short_SMA"] and row["Long_SMA"] > row["Short_SMA"]
+
 
 # run the signals
 def run_signals(data, indicators):
     for indicator in indicators.keys():
-        data[indicator + "_buy_signal"] = data.apply(lambda row: indicators[indicator]["buy"](row, data.iloc[row.name - 1] if row.name > 0 else None), axis=1)
-        data[indicator + "_sell_signal"] = data.apply(lambda row: indicators[indicator]["sell"](row, data.iloc[row.name - 1] if row.name > 0 else None), axis=1)
+        data[indicator + "_buy_signal"] = data.apply(
+            lambda row: indicators[indicator]["buy"](row, data.iloc[row.name - 1] if row.name > 0 else None), axis=1)
+        data[indicator + "_sell_signal"] = data.apply(
+            lambda row: indicators[indicator]["sell"](row, data.iloc[row.name - 1] if row.name > 0 else None), axis=1)
 
     for indicator in indicators.keys():
         data[indicator + "_buy_signal"] = data[indicator + "_buy_signal"].astype(int)
         data[indicator + "_sell_signal"] = data[indicator + "_sell_signal"].astype(int)
     return data
 
+
 # do trades
-def execute_trades(data, active_indicators, best_combination=None, cash=1_000_000, com=0.125/100, n_shares=10):
+def execute_trades(data, active_indicators, best_combination=None, cash=1_000_000, com=0.125 / 100, n_shares=10):
     operations = []
     strategy_value = [cash]
 
@@ -134,11 +157,12 @@ def execute_trades(data, active_indicators, best_combination=None, cash=1_000_00
     else:
         for indicator in active_indicators:
             data["total_buy_signals"] = data[[indicator + "_buy_signal" for indicator in active_indicators]].sum(axis=1)
-            data["total_sell_signals"] = data[[indicator + "_sell_signal" for indicator in active_indicators]].sum(axis=1)
+            data["total_sell_signals"] = data[[indicator + "_sell_signal" for indicator in active_indicators]].sum(
+                axis=1)
         total_active_indicators = len(active_indicators)
 
     for i, row in data.iterrows():
-        if total_active_indicators <=2:
+        if total_active_indicators <= 2:
             if data.total_buy_signals.iloc[i] == total_active_indicators:
                 # if ...: # TODO: HAVE ENOUGH CASH?
                 cash, operations = open_operation("long", row, cash, com, n_shares, operations)
@@ -162,22 +186,26 @@ def execute_trades(data, active_indicators, best_combination=None, cash=1_000_00
 
     return strategy_value
 
+
 # when we have an open operation
 def open_operation(operation_type, row, cash, com, n_shares, operations):
     if operation_type == "long":
         stop_loss = row["Close"] * 0.85
         take_profit = row["Close"] * 1.15
-    else: # short
+    else:  # short
         stop_loss = row["Close"] * 1.15
         take_profit = row["Close"] * 0.85
 
-    operations.append({"operation_type": operation_type, "bought_at": row["Close"], "timestamp": row.name, "n_shares": n_shares, "stop_loss": stop_loss, "take_profit": take_profit, "closed": False})
+    operations.append(
+        {"operation_type": operation_type, "bought_at": row["Close"], "timestamp": row.name, "n_shares": n_shares,
+         "stop_loss": stop_loss, "take_profit": take_profit, "closed": False})
     if operation_type == "long":
         cash -= row["Close"] * n_shares * (1 + com)
-    else: # short
-        cash += row["Close"] * n_shares * (1 - com) # we get chash for a short position
+    else:  # short
+        cash += row["Close"] * n_shares * (1 - com)  # we get chash for a short position
 
     return cash, operations
+
 
 # see if we close the operations or not, depending on our SL and TP
 def check_close_operations(row, cash, operations, com):
@@ -194,22 +222,25 @@ def check_close_operations(row, cash, operations, com):
 
     return cash, operations
 
+
 # check de value of the trade
-def calculate_operation_value(operation, cp): # cp = current price
+def calculate_operation_value(operation, cp):  # cp = current price
     if operation["operation_type"] == "long":
         return operation["n_shares"] * cp
-    else: # short
-        return (2 * operation["bought_at"] - cp) * operation["n_shares"] # !!!!
+    else:  # short
+        return (2 * operation["bought_at"] - cp) * operation["n_shares"]  # !!!!
+
 
 # graphs
 def plot_results(strategy_value, data):
-    plt.figure(figsize=(12,5))
+    plt.figure(figsize=(12, 5))
     plt.plot(data["Datetime"], strategy_value[1:], label="Value of the Strategy")
     plt.xlabel("Date")
     plt.ylabel("Value")
     plt.legend()
     plt.grid()
     plt.show()
+
 
 # do combinations of indicators
 def combinatinos(data, n, indicators, cash):
@@ -227,7 +258,8 @@ def combinatinos(data, n, indicators, cash):
             best_result = result
             best_combination = combination
 
-    return  best_combination, best_result
+    return best_combination, best_result
+
 
 # new strategy
 def reset_strategy(data, initial_cash=1_000_000):
@@ -237,19 +269,28 @@ def reset_strategy(data, initial_cash=1_000_000):
     strategy_value = [cash]
     return active_indicators, cash, operations, strategy_value
 
+
 # optimize parameters for indicators
-def optimize_parameters(data, indicators, n_trials=100, initial_cash=1_000_000):
+def optimize_parameters(data, indicators_list, n_trials=100, initial_cash=1_000_000):
+
     def objective(trial):
+
+        indicators = {
+            "RSI": {"buy": rsi_buy_signal, "sell": rsi_sell_signal},
+            "BOL": {"buy": bol_buy_signal, "sell": bol_sell_signal},
+            "MACD": {"buy": macd_buy_signal, "sell": macd_sell_signal},
+            "STOCH": {"buy": stoch_buy_signal, "sell": stoch_sell_signal},
+            "SMA": {"buy": sma_buy_signal, "sell": sma_sell_signal}
+        }
+
+        indicators = buy_sell_signals(data, indicators)
+
         active_indicators = []
-        for indicator_name in indicators.keys():
-            if trial.suggest_categorical(indicator_name, [True, False]):
-                active_indicators.append(indicator_name)
 
         for indicator in active_indicators:
             if indicator == 'RSI':
                 rsi_window = trial.suggest_int('rsi_window', 5, 30)
                 indicators[indicator]['params'] = {'rsi_window': rsi_window}
-
 
             elif indicator == 'Bollinger':
                 bollinger_window = trial.suggest_int('bollinger_window', 10, 50)
@@ -259,13 +300,15 @@ def optimize_parameters(data, indicators, n_trials=100, initial_cash=1_000_000):
                 macd_fast = trial.suggest_int('macd_fast', 10, 20)
                 macd_slow = trial.suggest_int('macd_slow', 21, 40)
                 macd_sign = trial.suggest_int('macd_sign', 5, 15)
-                indicators[indicator]['params'] = {'macd_fast': macd_fast, 'macd_slow': macd_slow, 'macd_sign': macd_sign}
+                indicators[indicator]['params'] = {'macd_fast': macd_fast, 'macd_slow': macd_slow,
+                                                   'macd_sign': macd_sign}
 
             elif indicator == 'Stoch':
                 stoch_k_window = trial.suggest_int('stoch_k_window', 5, 21)
                 stoch_d_window = trial.suggest_int('stoch_d_window', 3, 14)
                 stoch_smoothing = trial.suggest_int('stoch_smoothing', 3, 14)
-                indicators[indicator]['params'] = {'stoch_k_window': stoch_k_window, 'stoch_d_window': stoch_d_window, 'stoch_smoothing': stoch_smoothing}
+                indicators[indicator]['params'] = {'stoch_k_window': stoch_k_window, 'stoch_d_window': stoch_d_window,
+                                                   'stoch_smoothing': stoch_smoothing}
 
             elif indicator == 'SMA':
                 short_ma_window = trial.suggest_int('short_ma_window', 5, 20)
@@ -287,9 +330,11 @@ def optimize_parameters(data, indicators, n_trials=100, initial_cash=1_000_000):
 
     return indicators, study.best_value
 
+
 def test_strategy(data, indicators, best_combination, cash):
     strategy_value = execute_trades(data, indicators, best_combination, cash)
     return strategy_value
+
 
 # How we do?
 def calculate_performance(data_path, cash=1_000_000):
@@ -316,6 +361,7 @@ def load_data(file_path):
     data.dropna(inplace=True)
     return data
 
+
 def test():
     test_file_mapping = {
         "A1T": "data/aapl_project_1m_test.csv",
@@ -330,10 +376,10 @@ def test():
         strategy_value = execute_trades(data, list(indicators.keys()))
         plot_results(strategy_value, data)
 
+
 def main():
     test()
 
+
 if __name__ == "__main__":
     main()
-
-
