@@ -30,4 +30,6 @@ import optuna
 #if __name__ == "__main__":
    # main()
 
-
+from ok import Operation, TradingStrategy
+strategy = TradingStrategy('A5')
+strategy.run_combinations()
