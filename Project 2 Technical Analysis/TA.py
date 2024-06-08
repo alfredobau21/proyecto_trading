@@ -243,84 +243,176 @@ def plot_results(strategy_value, data):
 
 
 # do combinations of indicators
-def combinatinos(data, n, indicators, cash):
-    best_result = 0
-    best_combination = None
-    all_indicators = list(indicators.keys())
-    combinations_of_indicators = combinations(all_indicators, n)
+class StrategyOptimization:
+    def __init__(self, data):
+        self.data = data
+        self.indicator_combinations = self.generate_combinations()
 
-    for combination in combinations_of_indicators:
-        active_indicators = list(combination)
-        strategy_value = execute_trades(data, active_indicators, best_combination, cash)
-        result = strategy_value[-1]
+    def generate_combinations(self):
+        indicators = ["RSI","Bollinger","MACD","Stoch","SMA"]
+        all_combo = []
 
-        if result > best_result:
-            best_result = result
-            best_combination = combination
+        for i in range(1, len(indicators) + 1):
+            all_combo.extend(combinations(indicators, i))
 
-    return best_combination, best_result
+        all_combo = [list[combo] for combo in all_combo]
+        # strategy = all_combo.copy()
 
 
-# new strategy
-def reset_strategy(data, initial_cash=1_000_000):
-    active_indicators = []
-    operations = []
-    cash = initial_cash
-    strategy_value = [cash]
-    return active_indicators, cash, operations, strategy_value
+
+        # for combination in combinations_of_indicators:
+        #     active_indicators = list(combination)
+        #     strategy_value = execute_trades(data, active_indicators, best_combination, cash)
+        #     result = strategy_value[-1]
+        #
+        #     if result > best_result:
+        #         best_result = result
+        #         best_combination = combination
+        #
+        # return best_combination, best_result
 
 
-# optimize parameters for indicators
-def optimize_parameters(data, indicators_list, n_trials=100, initial_cash=1_000_000):
-
-    def objective(trial):
-
-        indicators = {
-            "RSI": {"buy": rsi_buy_signal, "sell": rsi_sell_signal},
-            "BOL": {"buy": bol_buy_signal, "sell": bol_sell_signal},
-            "MACD": {"buy": macd_buy_signal, "sell": macd_sell_signal},
-            "STOCH": {"buy": stoch_buy_signal, "sell": stoch_sell_signal},
-            "SMA": {"buy": sma_buy_signal, "sell": sma_sell_signal}
-        }
-
-        indicators = buy_sell_signals(data, indicators)
-
+    # new strategy
+    def reset_strategy(data, initial_cash=1_000_000):
         active_indicators = []
+        operations = []
+        cash = initial_cash
+        strategy_value = [cash]
+        return active_indicators, cash, operations, strategy_value
 
-        for indicator in active_indicators:
-            if indicator == 'RSI':
-                rsi_window = trial.suggest_int('rsi_window', 5, 30)
-                indicators[indicator]['params'] = {'rsi_window': rsi_window}
 
-            elif indicator == 'Bollinger':
-                bollinger_window = trial.suggest_int('bollinger_window', 10, 50)
-                indicators[indicator]['params'] = {'bollinger_window': bollinger_window}
+    # optimize parameters for indicators
+    def optimize_parameters(data, indicators_list, n_trials=100, initial_cash=1_000_000):
 
-            elif indicator == 'MACD':
-                macd_fast = trial.suggest_int('macd_fast', 10, 20)
-                macd_slow = trial.suggest_int('macd_slow', 21, 40)
-                macd_sign = trial.suggest_int('macd_sign', 5, 15)
-                indicators[indicator]['params'] = {'macd_fast': macd_fast, 'macd_slow': macd_slow,
-                                                   'macd_sign': macd_sign}
+        def objective(trial,data, self):
+            strategy = {}
+            if "RSI" in self.indicator_combinations:
+                strategy["RSI"] = {
+                    "window": trial.suggest_int("rsi_window", 5, 50),
+                    "lower_threshold": trial.suggest_int("rsi_lower_threshold", 10, 30)
+                }
+            if "Bollinger" in self.indicator_combinations:
+                strategy["Bollinger"] = {
+                    "window": trial.suggest_int("bollinger_window", 5, 50),
+                    "std": trial.suggest_float("bollinger_std", 1.5, 3.5)
+                }
+            if "MACD" in self.indicator_combinations:
+                strategy["MACD"] = {
+                    "window_slow": trial.suggest_int("macd_window_slow", 20, 50),
+                    "window_fast": trial.suggest_int("macd_window_fast", 5, 20),
+                    "window_sign": trial.suggest_int("macd_window_sign", 5, 20)
+                }
+            if "Stoch" in self.indicator_combinations:
+                strategy["Stoch"] = {
+                    "window": trial.suggest_int("stoch_window", 5, 50),
+                    "smooth_window": trial.suggest_int("stoch_smooth_window", 3, 10),
+                    "threshold": trial.suggest_float("stoch_threshold", 0.2, 0.8)
+                }
+            if "SMA" in self.indicator_combinations:
+                strategy["SMA"] = {
+                    "window": trial.suggest_int("sma_window", 5, 50)
+                }
+            strategy["n_shares"] = trial.suggest_int("n_shares", 50, 150)
+            strategy["stop_loss"] = trial.suggest_float("stop_loss", 0.05, 0.15)
+            strategy["take_profit"] = trial.suggest_float("take_profit", 0.05, 0.15)
 
-            elif indicator == 'Stoch':
-                stoch_k_window = trial.suggest_int('stoch_k_window', 5, 21)
-                stoch_d_window = trial.suggest_int('stoch_d_window', 3, 14)
-                stoch_smoothing = trial.suggest_int('stoch_smoothing', 3, 14)
-                indicators[indicator]['params'] = {'stoch_k_window': stoch_k_window, 'stoch_d_window': stoch_d_window,
-                                                   'stoch_smoothing': stoch_smoothing}
+            backtest = Backtest(self.data, strategy)
+            portfolio_value = backtest.run_backtest()
+            return portfolio_value[-1]
 
-            elif indicator == 'SMA':
-                short_ma_window = trial.suggest_int('short_ma_window', 5, 20)
-                long_ma_window = trial.suggest_int('long_ma_window', 21, 50)
-                indicators[indicator]['params'] = {'short_ma_window': short_ma_window, 'long_ma_window': long_ma_window}
+            def optimize(self):
+                study = optuna.create_study(direction='maximize')
+                study.optimize(self.objective, n_trials=50)
+                return study.best_params
+            # strategies = {"RSI": {"window": rsi_window, "lower_threshold": rsi_lower_threshold},
+            #          "Bollinger": {"window": boll_window, "std": std_boll},
+            #          "MACD": {"slow": MACD_slow, "fast": MACD_fast, "sign": MACD_sign},
+            #          "Stoch": {"window": stoch_window, "smooth": stoch_smooth, "threshold": stoch_threshold},
+            #          "SMA": {"window": sma_window}}
+            strategy = {"RSI": {"window": 14, "lower_threshold": 30},
+                          "Bollinger": {"window": 20, "std": 2},
+                          "MACD": {"slow": 26, "fast": 12, "sign": 9},
+                          "Stoch": {"window": 14, "smooth": 3, "threshold": 0.2},
+                          "SMA": {"window": 30}
+                          "n_shares": 100,
+                          "stop_loss": 0.1,
+                          "take_profit": 0.2
+                          }
+        def generate_signals(data, strategies):
+            if "RSI" in strategies.keys():
+                rsi_ta = ta.momentum.RSI(data["Close"], window=strategies["RSI"]["window"])
+                rsi_df = rsi_ta.rsi()
 
-        # Execute strategy
-        strategy_value = execute_trades(data, active_indicators, cash=initial_cash)
-        return strategy_value[-1]
 
-    study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=n_trials)
+
+            #
+            # strategy["n_shares"] = trial.suggest_int("n_shares", 50, 150)
+            # strategy["stop_loss"] = trial.suggest_float("stop_loss", 0.05, 0.15)
+            # strategy["take_profit"] = trial.suggest_float("take_profit", 0.05, 0.15)
+
+            backtest = Backtest(self.data, strategy)
+            portfolio_value = backtest.run_backtest()
+            return portfolio_value[-1]
+        # "window": trial.suggest_int("rsi_window", 5, 50),
+        # "lower_threshold": trial.suggest_int("rsi_lower_threshold", 10, 30)
+        # strategies["Bollinger"] = {
+        #     "window": trial.suggest_int("bollinger_window", 5, 50),
+        #     "std": trial.suggest_float("bollinger_std", 1.5, 3.5)
+        # }
+        # if "MACD" in self.indicator_combinations:
+        #     strategies["MACD"] = {
+        #         "window_slow": trial.suggest_int("macd_window_slow", 20, 50),
+        #         "window_fast": trial.suggest_int("macd_window_fast", 5, 20),
+        #         "window_sign": trial.suggest_int("macd_window_sign", 5, 20)
+        #     }
+        # if "Stoch" in self.indicator_combinations:
+
+            # indicators = {
+            #     "RSI": {"buy": rsi_buy_signal, "sell": rsi_sell_signal},
+            #     "BOL": {"buy": bol_buy_signal, "sell": bol_sell_signal},
+            #     "MACD": {"buy": macd_buy_signal, "sell": macd_sell_signal},
+            #     "STOCH": {"buy": stoch_buy_signal, "sell": stoch_sell_signal},
+            #     "SMA": {"buy": sma_buy_signal, "sell": sma_sell_signal}
+            # }
+
+            indicators = buy_sell_signals(data, indicators)
+
+            active_indicators = []
+
+            for indicator in active_indicators:
+                if indicator == 'RSI':
+                    rsi_window = trial.suggest_int('rsi_window', 5, 30)
+                    indicators[indicator]['params'] = {'rsi_window': rsi_window}
+
+                elif indicator == 'Bollinger':
+                    bollinger_window = trial.suggest_int('bollinger_window', 10, 50)
+                    indicators[indicator]['params'] = {'bollinger_window': bollinger_window}
+
+                elif indicator == 'MACD':
+                    macd_fast = trial.suggest_int('macd_fast', 10, 20)
+                    macd_slow = trial.suggest_int('macd_slow', 21, 40)
+                    macd_sign = trial.suggest_int('macd_sign', 5, 15)
+                    indicators[indicator]['params'] = {'macd_fast': macd_fast, 'macd_slow': macd_slow,
+                                                       'macd_sign': macd_sign}
+
+                elif indicator == 'Stoch':
+                    stoch_k_window = trial.suggest_int('stoch_k_window', 5, 21)
+                    stoch_d_window = trial.suggest_int('stoch_d_window', 3, 14)
+                    stoch_smoothing = trial.suggest_int('stoch_smoothing', 3, 14)
+                    indicators[indicator]['params'] = {'stoch_k_window': stoch_k_window, 'stoch_d_window': stoch_d_window,
+                                                       'stoch_smoothing': stoch_smoothing}
+
+                elif indicator == 'SMA':
+                    short_ma_window = trial.suggest_int('short_ma_window', 5, 20)
+                    long_ma_window = trial.suggest_int('long_ma_window', 21, 50)
+                    indicators[indicator]['params'] = {'short_ma_window': short_ma_window, 'long_ma_window': long_ma_window}
+
+            # Execute strategy
+            strategy_value = execute_trades(data, active_indicators, cash=initial_cash)
+            return strategy_value[-1]
+
+        study = optuna.create_study(direction='maximize')
+        study.optimize(objective, n_trials=n_trials)
 
     # Get and apply best params for each indicator
     print(f"Mejores parámetros encontrados: {study.best_params}")
