@@ -5,19 +5,6 @@ from itertools import combinations
 import optuna
 
 
-# # load training data
-# def load_train(file):
-#     file_mapping = {
-#         "A1": "data/aapl_project_1m_train.csv",
-#         "A5": "data/aapl_project_train.csv",
-#         "B1": "data/btc_project_1m_train.csv",
-#         "B5": "data/btc_project_train.csv",
-#     }
-#     file_name = file_mapping.get(file)
-#     if not file_name:
-#         raise ValueError("File not found.")
-#     data = pd.read_csv(file_name).dropna()
-#     return data
 
 
 class TechnicalIndicators:
@@ -57,10 +44,14 @@ class Backtest:
         self.active_positions = []
 
     def generate_signals(self):
+        self.data['BUY_SIGNAL'] = True
+        self.data['SELL_SIGNAL'] = True
+
         if "RSI" in self.strategy.keys():
             rsi_ta = ta.momentum.RSIIndicator(close=self.data['Close'], window=self.strategy["RSI"]["window"])
             self.data['RSI'] = rsi_ta.rsi()
             self.data['BUY_SIGNAL'] = self.data['RSI'] < self.strategy["RSI"]["lower_threshold"]
+            self.data['SELL_SIGNAL'] = self.data['RSI'] > (100 - self.strategy["RSI"]["lower_threshold"])
 
         if "Bollinger" in self.strategy.keys():
             bollinger_ta = ta.volatility.BollingerBands(close=self.data['Close'],
@@ -70,6 +61,7 @@ class Backtest:
             self.data['Bollinger_L'] = bollinger_ta.bollinger_lband()
             self.data['Bollinger_M'] = bollinger_ta.bollinger_mavg()
             self.data['BUY_SIGNAL'] &= bollinger_ta.bollinger_lband_indicator()
+            self.data['SELL_SIGNAL'] &= bollinger_ta.bollinger_hband_indicator()
 
         if "MACD" in self.strategy.keys():
             macd_ta = ta.trend.MACD(close=self.data['Close'], window_slow=self.strategy["MACD"]["window_slow"],
@@ -78,6 +70,7 @@ class Backtest:
             self.data['MACD'] = macd_ta.macd()
             self.data['MACD_Signal'] = macd_ta.macd_signal()
             self.data['BUY_SIGNAL'] &= self.data['MACD'] > self.data['MACD_Signal']
+            self.data['SELL_SIGNAL'] &= self.data['MACD'] < self.data['MACD_Signal']
 
         if "Stoch" in self.strategy.keys():
             stoch_ta = ta.momentum.StochasticOscillator(close=self.data['Close'], high=self.data['High'],
@@ -85,11 +78,18 @@ class Backtest:
                                                         smooth_window=self.strategy["Stoch"]["smooth_window"])
             self.data['Stoch'] = stoch_ta.stoch()
             self.data['BUY_SIGNAL'] &= self.data['Stoch'] < self.strategy["Stoch"]["threshold"]
+            self.data['SELL_SIGNAL'] &= self.data['Stoch'] > (1 - self.strategy["Stoch"]["threshold"])
 
         if "SMA" in self.strategy.keys():
             sma_ta = ta.trend.SMAIndicator(close=self.data['Close'], window=self.strategy["SMA"]["window"])
             self.data['SMA'] = sma_ta.sma_indicator()
             self.data['BUY_SIGNAL'] &= self.data['Close'] > self.data['SMA']
+            self.data['SELL_SIGNAL'] &= self.data['Close'] < self.data['SMA']
+            bollinger_ta = ta.volatility.BollingerBands(close=self.data['Close'],
+                                                        window=self.strategy["Bollinger"]["window"],
+                                                        window_dev=self.strategy["Bollinger"]["std"])
+
+
 
     def run_backtest(self):
         self.generate_signals()
@@ -147,7 +147,7 @@ class Backtest:
             self.active_positions.remove(pos)
 
         self.portfolio_value.append(self.capital)
-        return self.portfolio_value[-1]
+        return self.portfolio_value
 
     def plot_results(self):
         capital_benchmark = self.initial_capital
@@ -198,37 +198,37 @@ class StrategyOptimization:
     # optimize parameters for indicators
     # def optimize_parameters(data, indicators_list, n_trials=100, initial_cash=1_000_000):
 
-    def objective(self, data, trial):
+    def objective(self, trial):
         strategy = {}
         if "RSI" in self.indicator_combinations:
             strategy["RSI"] = {
-                "window": self.suggest_int("rsi_window", 5, 50),
-                "lower_threshold": self.suggest_int("rsi_lower_threshold", 10, 30)
+                "window": trial.suggest_int("rsi_window", 5, 50),
+                "lower_threshold": trial.suggest_int("rsi_lower_threshold", 10, 30)
             }
         if "Bollinger" in self.indicator_combinations:
             strategy["Bollinger"] = {
-                "window": self.suggest_int("bollinger_window", 5, 50),
-                "std": self.suggest_float("bollinger_std", 1.5, 3.5)
+                "window": trial.suggest_int("bollinger_window", 5, 50),
+                "std": trial.suggest_float("bollinger_std", 1.5, 3.5)
             }
         if "MACD" in self.indicator_combinations:
             strategy["MACD"] = {
-                "window_slow": self.suggest_int("macd_window_slow", 20, 50),
-                "window_fast": self.suggest_int("macd_window_fast", 5, 20),
-                "window_sign": self.suggest_int("macd_window_sign", 5, 20)
+                "window_slow": trial.suggest_int("macd_window_slow", 20, 50),
+                "window_fast": trial.suggest_int("macd_window_fast", 5, 20),
+                "window_sign": trial.suggest_int("macd_window_sign", 5, 20)
             }
         if "Stoch" in self.indicator_combinations:
             strategy["Stoch"] = {
-                "window": self.suggest_int("stoch_window", 5, 50),
-                "smooth_window": self.suggest_int("stoch_smooth_window", 3, 10),
-                "threshold": self.suggest_float("stoch_threshold", 0.2, 0.8)
+                "window": trial.suggest_int("stoch_window", 5, 50),
+                "smooth_window": trial.suggest_int("stoch_smooth_window", 3, 10),
+                "threshold": trial.suggest_float("stoch_threshold", 0.2, 0.8)
             }
         if "SMA" in self.indicator_combinations:
             strategy["SMA"] = {
-                "window": self.suggest_int("sma_window", 5, 50)
+                "window": trial.suggest_int("sma_window", 5, 50)
             }
-        strategy["n_shares"] = self.suggest_int("n_shares", 50, 150)
-        strategy["stop_loss"] = self.suggest_float("stop_loss", 0.05, 0.15)
-        strategy["take_profit"] = self.suggest_float("take_profit", 0.05, 0.15)
+        strategy["n_shares"] = trial.suggest_int("n_shares", 50, 150)
+        strategy["stop_loss"] = trial.suggest_float("stop_loss", 0.05, 0.15)
+        strategy["take_profit"] = trial.suggest_float("take_profit", 0.05, 0.15)
 
         backtest = Backtest(self.data, strategy)
         portfolio_value = backtest.run_backtest()
@@ -268,8 +268,8 @@ ti.calculate_sma(window=30)
             #          "SMA": {"window": sma_window}}
 strategy = {"RSI": {"window": 14, "lower_threshold": 30},
             "Bollinger": {"window": 20, "std": 2},
-            "MACD": {"slow": 26, "fast": 12, "sign": 9},
-            "Stoch": {"window": 14, "smooth": 3, "threshold": 0.2},
+            "MACD": {"window_slow": 26, "window_fast": 12, "window_sign": 9},
+            "Stoch": {"window": 14, "smooth_window": 3, "threshold": 0.2},
             "SMA": {"window": 30},
             "n_shares": 100,
             "stop_loss": 0.1,
