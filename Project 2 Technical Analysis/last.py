@@ -76,9 +76,9 @@ class TradingStrategy:
 
     def profit(self, trial, kwargs):
         capital = 1_000_000
-        n_shares = trial.suggest_int("n_shares", 50, 150)
-        stop_loss = trial.suggest_float("stop_loss", 0.05, 0.15)
-        take_profit = trial.suggest_float("take_profit", 0.05, 0.15)
+        n_shares = trial.suggest_int("n_shares", 90, 150)
+        stop_loss = trial.suggest_float("stop_loss", 0.08, 0.15)
+        take_profit = trial.suggest_float("take_profit", 0.08, 0.15)
         max_active_operations = 1000
         COM = 0.125 / 100
 
@@ -143,7 +143,7 @@ class TradingStrategy:
 
         return portfolio_value[-1]
 
-    def optimize_strategy(self, indicators, n_trials_per_strategy=2):
+    def optimize_strategy(self, indicators, n_trials_per_strategy=1):
         best_params = {}
         study = optuna.create_study(direction='maximize')
 
@@ -152,8 +152,8 @@ class TradingStrategy:
             kwargs = {}
             for indicator in strategy_indicators:
                 if indicator == 'RSI':
-                    rsi_window = 14
-                    rsi_lower_threshold = trial.suggest_int("rsi_lower_threshold", 10, 30)
+                    rsi_window = trial.suggest_int("rsi_window", 10, 15)
+                    rsi_lower_threshold = trial.suggest_int("rsi_lower_threshold", 10, 20)
                     kwargs['RSI'] = (rsi_window, rsi_lower_threshold)
                 elif indicator == 'Bollinger Bands':
                     bollinger_window = trial.suggest_int("bollinger_window", 5, 50)
@@ -179,11 +179,11 @@ class TradingStrategy:
                 best_params[subset] = study.best_params
 
         self.best_params = best_params
-        return best_params
+        return best_params, print(best_params)
 
     def backtest_strategy(self, test_file):
         test_data = pd.read_csv(test_file).dropna()
-        best_strategy = max(self.best_params, key=lambda k: self.profit_dummy(test_data, self.best_params[k]))
+        best_strategy = max(self.best_params, key=lambda k: self.profit(test_data, self.best_params[k]))
 
         best_indicators = list(best_strategy)
         best_params = self.best_params[best_strategy]
@@ -211,4 +211,7 @@ strategy = TradingStrategy('A5')  # Cambia el archivo según tu necesidad
 indicadores = ['RSI', 'Bollinger Bands', 'MACD', 'Stochastic', 'SMA']  # Indicadores disponibles
 best_params = strategy.optimize_strategy(indicadores)
 print(best_params)
-strategy.backtest_strategy('data/aapl_project_1m_test.csv')
+strategy.backtest_strategy('data/aapl_project_test.csv')
+
+# Mejor
+# [I 2024-06-08 14:09:44,686] Trial 24 finished with value: 2183885.177196395 and parameters: {'macd_fastperiod': 15, 'macd_slowperiod': 40, 'macd_signalperiod': 14, 'stochastic_k': 11, 'stochastic_d': 14, 'n_shares': 124, 'stop_loss': 0.0716953716687259, 'take_profit': 0.12671216792593243}. Best is trial 24 with value: 2183885.177196395.

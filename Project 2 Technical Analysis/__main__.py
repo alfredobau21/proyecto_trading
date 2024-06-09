@@ -30,6 +30,22 @@ import optuna
 #if __name__ == "__main__":
    # main()
 
-from ok import Operation, TradingStrategy
-strategy = TradingStrategy('A5')
+from last_3 import Operation, TradingStrategy
+strategy = TradingStrategy('B5')
 strategy.run_combinations()
+
+strategy.plot_results(best = True)
+
+strategy.test()
+
+strategy.strategy_value[-1]
+
+strategy.optimize_parameters()
+
+strategy.plot_results(best = True)
+
+strategy.strategy_value[-1]
+
+strategy.test()
+
+strategy.strategy_value[-1]
