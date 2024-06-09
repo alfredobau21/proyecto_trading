@@ -329,7 +329,7 @@ class TradingStrategy:
         data = pd.read_csv(data_path)
 
         # Turn date into datetime
-        data['Date'] = pd.to_datetime(data['Date'])
+        data['Datetime'] = pd.to_datetime(data['Datetime'])
 
         # Get first and last close data
         primer_cierre = data.iloc[0]['Close']
@@ -340,7 +340,7 @@ class TradingStrategy:
         print("The passive asset return from the first close to the last close is: {:.2%}".format(rend_pasivo))
 
         # Compare with used strategy
-        cashfinal = 1107153.05  #CHANGE !!!
+        cashfinal = 1348097.4477885822  #CHANGE !!!
         rend_estrategia = (cashfinal - cash) / cash
         print("The strategy return from the first close to the last close is: {:.2%}".format(rend_estrategia))
 
