@@ -9,9 +9,6 @@
 - **Report.ipynb**: Jupyter notebook containing visualizations, tables, and conclusions.
 - **README.md**: Description of the project and instructions to run the main code.
 - **requirements.txt**: Libraries and versions required to run the module.
-- **_init_.py**:
-- **_main_.py**:
-
 ## Usage
 
 ## Requirements
