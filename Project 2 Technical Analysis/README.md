@@ -61,7 +61,7 @@ Once the strategy has been chosen the user should hit
 
 
 
-=======
+
 # Trading Strategy Project
 
 ## Description
@@ -76,7 +76,7 @@ Once the strategy has been chosen the user should hit
 ## Usage
 
 ## Requirements
-- Python 3.10 or higher
+- Python 3.11 or higher
 - Libraries listed in `requirements.txt`
 
 ## Authors
