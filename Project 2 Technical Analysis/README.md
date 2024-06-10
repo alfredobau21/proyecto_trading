@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Technical Analysis Trading Project
 
 This project consists in simulation and modeling of trading
@@ -86,4 +86,3 @@ Once the strategy has been chosen the user should hit
 - Lopez Aguilar Jose Carlos
 - Gutierrez Flores Eduardo
 
->>>>>>> 967e68842785bb57cc73376858929c28ba703391
