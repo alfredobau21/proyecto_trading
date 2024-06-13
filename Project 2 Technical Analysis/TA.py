@@ -159,7 +159,7 @@ class TradingStrategy:
             total_value = self.cash + sum(self.calculate_operation_value(op, row['Close']) for op in self.operations if not op.closed)
             self.strategy_value.append(total_value)
 
-    def _open_operation(self, operation_type, row):
+    def open_operation(self, operation_type, row):
         if operation_type == 'long':
             stop_loss = row['Close'] * 0.85
             take_profit = row['Close'] * 1.15
