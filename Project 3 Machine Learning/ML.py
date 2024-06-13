@@ -3,13 +3,10 @@ import matplotlib.pyplot as plt
 import ta
 from itertools import combinations
 import optuna
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from xgboost import XGBClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score
-# from sklearn.metrics import confusion_matrix, mean_squared_error
 
 class Operation:
     def __init__(self, operation_type, bought_at, timestamp, n_shares, stop_loss, take_profit):
@@ -37,7 +34,6 @@ class TradingStrategy:
             "B5": "data/btc_project_train.csv"
         }
         self.load_data(self.file)
-        self.indicators = {}
         self.active_indicators = []
         self.calculate_variables()
         self.best_combination = None
@@ -63,8 +59,8 @@ class TradingStrategy:
         # Stochastic K and D
         self.data["Stoch_K_16"] = ta.momentum.stochrsi_k(self.data["Close"], window=16, smooth1=3, smooth2=3)
         self.data["Stoch_K_18"] = ta.momentum.stochrsi_k(self.data["Close"], window=18, smooth1=3, smooth2=3)
-        self.data["Stoch_D_5"] = ta.momentum.stochrsi_d(self.data["Close"], window=16, smooth1=3, smooth2=3,smooth3=5)
-        self.data["Stoch_D_7"] = ta.momentum.stochrsi_d(self.data["Close"], window=16, smooth1=3, smooth2=3,smooth3=7)
+        self.data["Stoch_D_5"] = ta.momentum.stochrsi_d(self.data["Close"], window=5, smooth1=3, smooth2=3)
+        self.data["Stoch_D_7"] = ta.momentum.stochrsi_d(self.data["Close"], window=7, smooth1=3, smooth2=3)
 
         # RSI
         self.data["RSI_10"] = ta.momentum.rsi(self.data["Close"], window=10)
@@ -128,7 +124,7 @@ class TradingStrategy:
             model = LogisticRegression(C=C, fit_intercept=fit_intercept, l1_ratio=l1_ratio)
             model.fit(x_train, y_train)
             y_pred = model.predict(x_test)
-            score = f1_score(x_test, y_pred, average='binary')
+            score = f1_score(y_test, y_pred, average='binary')
 
             return score
 
@@ -199,7 +195,6 @@ class TradingStrategy:
             self.data['SVM_SELL_SIGNAL'] = predictions
 
     def xgb_model(self, direction='buy'):
-
         # check if is a buy or a sell
         x_train = self.x_train
         y_train = self.y_train_buy if direction == 'buy' else self.y_train_sell
@@ -383,7 +378,7 @@ class TradingStrategy:
     def optimize(self):
         def objective(trial):
             stop_loss = trial.suggest_float('stop_loss', 0.80, 0.99)
-            take_profit = trial.suggest_float('take_profit', 1.01, 1.20)
+            take_profit = trial.suggest_float('take_profit', 1.05, 1.25)
             n_shares = trial.suggest_int('n_shares', 50, 150)
 
             self.reset_strategy()
@@ -421,3 +416,54 @@ class TradingStrategy:
         plt.xlabel('Number of Trades')
         plt.ylabel('Strategy Value')
         plt.show()
+
+class BM:
+    def rend(self, file):
+        if file == 'A1':
+            data = pd.read_csv('data/aapl_project_1m_test.csv')
+        elif file == 'A5':
+            data = pd.read_csv('data/aapl_project_test.csv')
+        elif file == 'B1':
+            data = pd.read_csv('data/btc_project_1m_test.csv')
+        elif file == 'B5':
+            data = pd.read_csv('data/btc_project_test.csv')
+
+        # Turn date into datetime
+        data['Datetime'] = pd.to_datetime(data['Datetime'])
+
+        # Get first and last close data
+        primer_cierre = data.iloc[0]['Close']
+        ultimo_cierre = data.iloc[-1]['Close']
+
+        # Get asset yeild
+        rend_pasivo = (ultimo_cierre - primer_cierre) / primer_cierre
+        print("The passive asset return is: {:.2%}".format(rend_pasivo))
+
+        # Compare with used strategy
+        cash = 1000000
+        cashfinal = 1931055.3570 # Change this
+        rend_estrategia = (cashfinal - cash) / cash
+        print("The trading strategy return is: {:.2%}".format(rend_estrategia))
+
+        # Sort data
+        data = data.sort_values(by='Datetime')
+
+        # Rend
+        data['Returns'] = data['Close'].pct_change().fillna(0)
+
+        # See the value passive
+        initial_investment = cash
+        data['Investment_Value'] = (1 + data['Returns']).cumprod() * initial_investment
+
+        # Graficar el rendimiento de la inversión
+        plt.figure(figsize=(12, 8))
+        plt.plot(data['Datetime'], data['Investment_Value'], label='Investment Value', color='blue')
+        plt.title('Passive strategy')
+        plt.xlabel('Date')
+        plt.ylabel('Investment Value')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+        valor_final = data['Investment_Value'].iloc[-1]
+        print("The final value of the investment: ${:,.2f}".format(valor_final))
