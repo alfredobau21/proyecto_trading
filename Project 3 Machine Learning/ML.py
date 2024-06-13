@@ -39,7 +39,7 @@ class TradingStrategy:
         self.best_combination = None
         self.best_value = 0
         self.stop_loss = 0.85
-        self.stop_loss = 1.15
+        self.take_profit = 1.15
 
     def load_data(self, time_frame):
         file_name = self.file_mapping.get(time_frame)
@@ -394,8 +394,8 @@ class TradingStrategy:
         print(f"Best params: {best_params}")
 
         # Use them!
-        self.stop_loss_pct = best_params['stop_loss_pct']
-        self.take_profit_pct = best_params['take_profit_pct']
+        self.stop_loss = best_params['stop_loss_pct']
+        self.take_profit = best_params['take_profit_pct']
         self.n_shares = best_params['n_shares']
 
     def test(self):
