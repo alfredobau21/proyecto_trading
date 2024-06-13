@@ -57,10 +57,10 @@ class TradingStrategy:
 
         # Some of the best indicators on our Technical Analysis
         # Stochastic K and D
-        self.data["Stoch_K_16"] = ta.momentum.stochrsi_k(self.data["Close"], window=16, smooth1=3, smooth2=3)
-        self.data["Stoch_K_18"] = ta.momentum.stochrsi_k(self.data["Close"], window=18, smooth1=3, smooth2=3)
-        self.data["Stoch_D_5"] = ta.momentum.stochrsi_d(self.data["Close"], window=5, smooth1=3, smooth2=3)
-        self.data["Stoch_D_7"] = ta.momentum.stochrsi_d(self.data["Close"], window=7, smooth1=3, smooth2=3)
+        self.data["Stoch_K_16"] = ta.momentum.stochrsi_k(self.data["Close"], window=16)
+        self.data["Stoch_K_18"] = ta.momentum.stochrsi_k(self.data["Close"], window=18)
+        self.data["Stoch_D_5"] = ta.momentum.stochrsi_d(self.data["Close"], window=5)
+        self.data["Stoch_D_7"] = ta.momentum.stochrsi_d(self.data["Close"], window=7)
 
         # RSI
         self.data["RSI_10"] = ta.momentum.rsi(self.data["Close"], window=10)
@@ -147,9 +147,9 @@ class TradingStrategy:
 
         # Put them on the dataset
         if direction == 'buy':
-            self.data['LR_BUY_SIGNAL'] = predictions
+            self.data['Logistic_BUY_SIGNAL'] = predictions
         elif direction == 'sell':
-            self.data['LR_SELL_SIGNAL'] = predictions
+            self.data['Logistic_SELL_SIGNAL'] = predictions
 
 
     def svm_model(self, direction='buy'):
@@ -243,9 +243,9 @@ class TradingStrategy:
 
         # Put them on the dataset
         if direction == 'buy':
-            self.data['XGB_BUY_SIGNAL'] = predictions
+            self.data['XGBoost_BUY_SIGNAL'] = predictions
         elif direction == 'sell':
-            self.data['XGB_SELL_SIGNAL'] = predictions
+            self.data['XGBoost_SELL_SIGNAL'] = predictions
 
     def optimize_and_fit_models(self):
         self.prepare_data()
@@ -267,14 +267,14 @@ class TradingStrategy:
 
         if best == True:
             for indicator in self.best_combination:
-                self.data['total_buy_signals'] = self.data[[indicator + '_buy_signal' for indicator in self.best_combination]].sum(axis=1)
-                self.data['total_sell_signals'] = self.data[[indicator + '_sell_signal' for indicator in self.best_combination]].sum(axis=1)
+                self.data['total_buy_signals'] = self.data[[indicator + '_BUY_SIGNAL' for indicator in self.best_combination]].sum(axis=1)
+                self.data['total_sell_signals'] = self.data[[indicator + '_SELL_SIGNAL' for indicator in self.best_combination]].sum(axis=1)
                 total_active_indicators = len(self.best_combination)
 
         else:  # False
             for indicator in self.active_indicators:
-                self.data['total_buy_signals'] = self.data[[indicator + '_buy_signal' for indicator in self.active_indicators]].sum(axis=1)
-                self.data['total_sell_signals'] = self.data[[indicator + '_sell_signal' for indicator in self.active_indicators]].sum(axis=1)
+                self.data['total_buy_signals'] = self.data[[indicator + '_BUY_SIGNAL' for indicator in self.active_indicators]].sum(axis=1)
+                self.data['total_sell_signals'] = self.data[[indicator + '_SELL_SIGNAL' for indicator in self.active_indicators]].sum(axis=1)
                 total_active_indicators = len(self.active_indicators)
 
         for i, row in self.data.iterrows():
@@ -342,11 +342,10 @@ class TradingStrategy:
 
     def run_combinations(self):
         all_indicators = ['Logistic', 'XGBoost', 'SVM']
-        num_indicators = len(all_indicators)
 
-        # Use just 1 indicator
-        for combo in combinations(all_indicators, 1):
-            self.active_indicators = list(combo)
+        # Use each indicator alone
+        for indicator in all_indicators:
+            self.active_indicators = [indicator]
             print(f"Using: {self.active_indicators} for ML")
             self.execute_trades()
 
@@ -356,7 +355,7 @@ class TradingStrategy:
                 self.best_combination = self.active_indicators.copy()
             self.reset_strategy()
 
-        # Stack them up
+        # Stack them up (use all indicators together)
         self.active_indicators = all_indicators
         print(f"Using: {self.active_indicators} for ML")
         self.execute_trades()
@@ -367,8 +366,7 @@ class TradingStrategy:
             self.best_combination = self.active_indicators.copy()
         self.reset_strategy()
 
-        print(
-            f"The best one was: {self.best_combination} with a value of: {self.best_value}")
+        print(f"The best one was: {self.best_combination} with a value of: {self.best_value}")
 
     def reset_strategy(self):
         self.operations.clear()
