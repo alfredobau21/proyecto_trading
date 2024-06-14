@@ -1,8 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import ta
-from itertools import combinations
 import optuna
+import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from xgboost import XGBClassifier
@@ -49,23 +49,31 @@ class TradingStrategy:
         self.data.dropna(inplace=True)
 
     def calculate_variables(self):
-        self.data = self.data.loc[:, ["Close"]]
-
         # 20 Lagged close values
         for i in range(1, 21):
             self.data[f"Close_t{i}"] = self.data["Close"].shift(i)
 
         # Some of the best indicators on our Technical Analysis
         # Stochastic K and D
-        self.data["Stoch_K_16"] = ta.momentum.stochrsi_k(self.data["Close"], window=16)
-        self.data["Stoch_K_18"] = ta.momentum.stochrsi_k(self.data["Close"], window=18)
-        self.data["Stoch_D_5"] = ta.momentum.stochrsi_d(self.data["Close"], window=5)
-        self.data["Stoch_D_7"] = ta.momentum.stochrsi_d(self.data["Close"], window=7)
+        stoch_indicator_16 = ta.momentum.StochasticOscillator(high=self.data['High'], low=self.data['Low'],
+                                                           close=self.data['Close'], window=16, smooth_window=3)
+        self.data['Stoch_K_16'] = stoch_indicator_16.stoch()
+        self.data['Stoch_D_16'] = stoch_indicator_16.stoch_signal()
+
+        stoch_indicator_18 = ta.momentum.StochasticOscillator(high=self.data['High'], low=self.data['Low'],
+                                                           close=self.data['Close'], window=18, smooth_window=3)
+        self.data['Stoch_K_18'] = stoch_indicator_18.stoch()
+        self.data['Stoch_D_18'] = stoch_indicator_18.stoch_signal()
 
         # RSI
-        self.data["RSI_10"] = ta.momentum.rsi(self.data["Close"], window=10)
-        self.data["RSI_11"] = ta.momentum.rsi(self.data["Close"], window=11)
-        self.data["RSI_15"] = ta.momentum.rsi(self.data["Close"], window=15)
+        rsi_indicator_10 = ta.momentum.RSIIndicator(close=self.data['Close'], window=10)
+        self.data['RSI_10'] = rsi_indicator_10.rsi()
+
+        rsi_indicator_11 = ta.momentum.RSIIndicator(close=self.data['Close'], window=11)
+        self.data['RSI_11'] = rsi_indicator_11.rsi()
+
+        rsi_indicator_15 = ta.momentum.RSIIndicator(close=self.data['Close'], window=15)
+        self.data['RSI_15'] = rsi_indicator_15.rsi()
 
         # Volatility & Returns
         self.data["Returns"] = self.data["Close"].pct_change()
@@ -89,7 +97,7 @@ class TradingStrategy:
                      'Close_t6', 'Close_t7', 'Close_t8', 'Close_t9', 'Close_t10',
                      'Close_t11', 'Close_t12', 'Close_t13', 'Close_t14', 'Close_t15',
                      'Close_t16', 'Close_t17', 'Close_t18', 'Close_t19', 'Close_t20',
-                     'Stoch_K_16', 'Stoch_K_18', 'Stoch_D_5', 'Stoch_D_7', 'RSI_10',
+                     'Stoch_K_16', 'Stoch_K_18', 'Stoch_D_16', 'Stoch_D_18', 'RSI_10',
                      'RSI_11', 'RSI_15', 'Returns', 'Volatility', 'EMA_20',
                      'BUY_SIGNAL', 'SELL_SIGNAL']
 
@@ -98,16 +106,16 @@ class TradingStrategy:
         cut = int(len(self.x) * train_size)
 
         # TRAIN
-        self.x_train = self.x.iloc[:cut]
+        self.x_train = self.x.iloc[:cut].copy()
+        self.y_train_buy = self.x_train["BUY_SIGNAL"].copy()
+        self.y_train_sell = self.x_train["SELL_SIGNAL"].copy()
         self.x_train = self.x_train.drop(columns=["BUY_SIGNAL", "SELL_SIGNAL"])
-        self.y_train_buy = self.x_train["BUY_SIGNAL"]
-        self.y_train_sell = self.x_train["SELL_SIGNAL"]
 
         # TEST
-        self.x_test = self.x.iloc[cut:]
+        self.x_test = self.x.iloc[cut:].copy()
+        self.y_test_buy = self.x_test["BUY_SIGNAL"].copy()
+        self.y_test_sell = self.x_test["SELL_SIGNAL"].copy()
         self.x_test = self.x_test.drop(columns=["BUY_SIGNAL", "SELL_SIGNAL"])
-        self.y_test_buy = self.x_test["BUY_SIGNAL"]
-        self.y_test_sell = self.x_test["SELL_SIGNAL"]
 
     def lr_model(self, direction='buy'):
         # check if is a buy or a sell
@@ -117,19 +125,19 @@ class TradingStrategy:
         y_test = self.y_test_buy if direction == 'buy' else self.y_test_sell
 
         def obj_lr(trial):
-            C = trial.suggest_float('C', 0.01, 0.99, log=True)
+            C = trial.suggest_float('C', 1e-6, 1e+6, log=True)
             l1_ratio = trial.suggest_float('l1_ratio', 0.001, 0.999)
-            fit_intercept = trial.suggest_categorial('fit_intercept', [True, False])
+            fit_intercept = trial.suggest_categorical('fit_intercept', [True, False])
 
-            model = LogisticRegression(C=C, fit_intercept=fit_intercept, l1_ratio=l1_ratio)
+            model = LogisticRegression(C=C, fit_intercept=fit_intercept, l1_ratio=l1_ratio, penalty='elasticnet', solver='saga', max_iter=10000)
             model.fit(x_train, y_train)
             y_pred = model.predict(x_test)
             score = f1_score(y_test, y_pred, average='binary')
 
             return score
 
-        study = optuna.create_study(direction=direction)
-        study.optimize(obj_lr, n_trials=20)
+        study = optuna.create_study(direction='maximize')
+        study.optimize(obj_lr, n_trials=30)
 
         if direction == 'buy':
             self.best_buy_lr = study.best_params
@@ -138,7 +146,7 @@ class TradingStrategy:
 
         # Train on the whole training dataset
         best_lr_params = study.best_params
-        best_model = LogisticRegression(**best_lr_params, penalty='elasticnet', solver='saga', max_iter=30_000)
+        best_model = LogisticRegression(**best_lr_params, penalty='elasticnet', solver='saga', max_iter=10_000)
         best_model.fit(x_train, y_train)
 
         # Predictions
@@ -164,7 +172,7 @@ class TradingStrategy:
             kernel = trial.suggest_categorical('kernel', ['linear', 'rbf', 'poly'])
             gamma = 'scale' if kernel == 'linear' else trial.suggest_float('gamma', 1e-6, 1e+1, log=True)
 
-            model = SVC(C=C, kernel=kernel, gamma=gamma)
+            model = SVC(C=C, kernel=kernel, gamma=gamma, max_iter=10000)
             model.fit(x_train, y_train)
             y_pred = model.predict(x_test)
             score = f1_score(y_test, y_pred, average='binary')
@@ -172,7 +180,7 @@ class TradingStrategy:
             return score
 
         study = optuna.create_study(direction='maximize')
-        study.optimize(obj_svm, n_trials=20)
+        study.optimize(obj_svm, n_trials=10)
 
         if direction == 'buy':
             self.best_buy_svm = study.best_params
@@ -181,7 +189,7 @@ class TradingStrategy:
 
         # Train on the whole training dataset
         best_svm_params = study.best_params
-        best_model = SVC(**best_svm_params)
+        best_model = SVC(**best_svm_params, max_iter=10_000)
         best_model.fit(x_train, y_train)
 
         # Predictions
@@ -225,7 +233,7 @@ class TradingStrategy:
             return score
 
         study = optuna.create_study(direction='maximize')
-        study.optimize(obj_xgb, n_trials=20)
+        study.optimize(obj_xgb, n_trials=30)
 
         if direction == 'buy':
             self.best_buy_xgb = study.best_params
@@ -386,7 +394,7 @@ class TradingStrategy:
             return final_strategy_value
 
         study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=100)
+        study.optimize(objective, n_trials=50)
 
         best_params = study.best_params
         print(f"Best params: {best_params}")
@@ -395,6 +403,8 @@ class TradingStrategy:
         self.stop_loss = best_params['stop_loss_pct']
         self.take_profit = best_params['take_profit_pct']
         self.n_shares = best_params['n_shares']
+
+    # TODO train en todo el train dataset y luego testearlo con .predict
 
     def test(self):
         test_file_mapping = {
