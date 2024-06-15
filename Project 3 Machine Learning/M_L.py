@@ -86,8 +86,8 @@ class TradingStrategy:
         self.data['EMA_20'] = ta.trend.ema_indicator(self.data["Close"], window=20)
 
         # Signals
-        self.data['buy_s'] = (self.data.Close < self.data.Close.shift(-20)).astype(int)
-        self.data['sell_s'] = (self.data.Close > self.data.Close.shift(-20)).astype(int)
+        self.data['buy_s'] = (self.data.Close < self.data.Close.shift(-5)).astype(int)
+        self.data['sell_s'] = (self.data.Close > self.data.Close.shift(-5)).astype(int)
 
         self.data.dropna(inplace=True)
 
@@ -95,13 +95,13 @@ class TradingStrategy:
 
     def prepare_data(self, train_size=0.75):
 
-        features = ['Close_t1', 'Close_t2', 'Close_t3', 'Close_t4', 'Close_t5',
-                     'Close_t6', 'Close_t7', 'Close_t8', 'Close_t9', 'Close_t10',
-                     'Close_t11', 'Close_t12', 'Close_t13', 'Close_t14', 'Close_t15',
-                     'Close_t16', 'Close_t17', 'Close_t18', 'Close_t19', 'Close_t20',
-                     'Stoch_K_16', 'Stoch_K_18', 'Stoch_D_16', 'Stoch_D_18', 'RSI_10',
-                     'RSI_11', 'RSI_15', 'Returns', 'Volatility', 'EMA_20', 'buy_s', 'sell_s']
 
+        features = ['Close_t1', 'Close_t2', 'Close_t3', 'Close_t4', 'Close_t5',
+                    'Close_t6', 'Close_t7', 'Close_t8', 'Close_t9', 'Close_t10',
+                    'Close_t11', 'Close_t12', 'Close_t13', 'Close_t14', 'Close_t15',
+                    'Close_t16', 'Close_t17', 'Close_t18', 'Close_t19', 'Close_t20',
+                    'Stoch_K_16', 'Stoch_K_18', 'Stoch_D_16', 'Stoch_D_18', 'RSI_10',
+                    'RSI_11', 'RSI_15', 'Returns', 'Volatility', 'EMA_20', 'buy_s', 'sell_s']
         self.X = self.data[features]
 
         cut = int(len(self.X) * (train_size))
@@ -380,8 +380,8 @@ class TradingStrategy:
 
     def optimize_trade_parameters(self):
         def objective(trial):
-            stop_loss_pct = trial.suggest_float('stop_loss_pct', 0.90, 0.99)
-            take_profit_pct = trial.suggest_float('take_profit_pct', 1.01, 1.10)
+            stop_loss_pct = trial.suggest_float('stop_loss_pct', 0.80, 0.99)
+            take_profit_pct = trial.suggest_float('take_profit_pct', 1.05, 1.15)
             n_shares = trial.suggest_int('n_shares', 1, 100)
 
             self.reset_strategy()
