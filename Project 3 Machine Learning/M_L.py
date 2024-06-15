@@ -285,7 +285,6 @@ class TradingStrategy:
                     [indicator + '_sell_signal' for indicator in self.best_combination]].sum(axis=1)
                 total_active_indicators = len(self.best_combination)
 
-
         else:  # False
             for indicator in self.active_indicators:
                 self.data['total_buy_signals'] = self.data[
@@ -380,9 +379,9 @@ class TradingStrategy:
 
     def optimize_trade_parameters(self):
         def objective(trial):
-            stop_loss_pct = trial.suggest_float('stop_loss_pct', 0.80, 0.99)
+            stop_loss_pct = trial.suggest_float('stop_loss_pct', 0.80, 0.95)
             take_profit_pct = trial.suggest_float('take_profit_pct', 1.05, 1.15)
-            n_shares = trial.suggest_int('n_shares', 1, 100)
+            n_shares = trial.suggest_int('n_shares', 50, 150)
 
             self.reset_strategy()
             self.execute_trades(best=True, stop_loss=stop_loss_pct, take_profit=take_profit_pct, n_shares=n_shares)

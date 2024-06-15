@@ -13,10 +13,10 @@ class TradingStrategy:
         self.cash = 100000  # Inicial cash amount
         self.operations = []
         self.strategy_value = [self.cash]
-        self.stop_loss = 0.85
-        self.take_profit = 1.15
-        self.n_shares = 80
-        self.com = 0.001  # Commission fee
+        self.stop_loss = 0.85 # Change
+        self.take_profit = 1.15 # Change
+        self.n_shares = 80 # Change
+        self.com = 0.00125
 
     def calculate_features(self, data):
         for i in range(1, 21):
@@ -147,6 +147,9 @@ class TradingStrategy:
     def plot_results(self):
         self.reset_strategy()
         self.execute_trades()
+        final_portfolio_value = self.strategy_value[-1]
+        print(f'Final Portfolio Value: {final_portfolio_value}')
+
         plt.figure(figsize=(12, 8))
         plt.plot(self.strategy_value)
         plt.title('Trading Strategy Performance')
