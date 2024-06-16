@@ -1,14 +1,12 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import ta
-from itertools import combinations
 import optuna
-import numpy as np
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from xgboost import XGBClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score
+import numpy as np
 
 class Operation:
     def __init__(self, operation_type, bought_at, timestamp, n_shares, stop_loss, take_profit):
@@ -78,6 +76,7 @@ class TradingStrategy:
         rsi_indicator_15 = ta.momentum.RSIIndicator(close=self.data['Close'], window=15)
         self.data['RSI_15'] = rsi_indicator_15.rsi()
 
+        # Some other features that may work
         # Volatility & Returns
         self.data['Returns'] = self.data["Close"].pct_change()
         self.data['Volatility'] = self.data["Returns"].rolling(window=10).std()
@@ -85,9 +84,23 @@ class TradingStrategy:
         # Ewma
         self.data['EMA_20'] = ta.trend.ema_indicator(self.data["Close"], window=20)
 
+        # ATR
+        self.data['ATR'] = ta.volatility.average_true_range(self.data['High'], self.data['Low'], self.data['Close'])
+
+        # MACD
+        self.data['MACD'] = ta.trend.macd(self.data['Close'])
+        self.data['MACD_Signal'] = ta.trend.macd_signal(self.data['Close'])
+
+        # ADX
+        self.data['ADX'] = ta.trend.adx(self.data['High'], self.data['Low'], self.data['Close'])
+
+        # Candlestick Patterns
+        self.data['Engulfing'] = np.where((self.data['Open'] < self.data['Close'].shift(1)) &(self.data['Close'] > self.data['Open'].shift(1)), 1, 0)
+        self.data['Doji'] = np.where(np.abs(self.data['Close'] - self.data['Open']) <= (self.data['High'] - self.data['Low']) * 0.1, 1, 0)
+
         # Signals
-        self.data['buy_s'] = (self.data.Close < self.data.Close.shift(-5)).astype(int)
-        self.data['sell_s'] = (self.data.Close > self.data.Close.shift(-5)).astype(int)
+        self.data['buy_s'] = (self.data.Close < self.data.Close.shift(-10)).astype(int)
+        self.data['sell_s'] = (self.data.Close > self.data.Close.shift(-10)).astype(int)
 
         self.data.dropna(inplace=True)
 
@@ -95,13 +108,14 @@ class TradingStrategy:
 
     def prepare_data(self, train_size=0.75):
 
-
         features = ['Close_t1', 'Close_t2', 'Close_t3', 'Close_t4', 'Close_t5',
                     'Close_t6', 'Close_t7', 'Close_t8', 'Close_t9', 'Close_t10',
                     'Close_t11', 'Close_t12', 'Close_t13', 'Close_t14', 'Close_t15',
                     'Close_t16', 'Close_t17', 'Close_t18', 'Close_t19', 'Close_t20',
                     'Stoch_K_16', 'Stoch_K_18', 'Stoch_D_16', 'Stoch_D_18', 'RSI_10',
-                    'RSI_11', 'RSI_15', 'Returns', 'Volatility', 'EMA_20', 'buy_s', 'sell_s']
+                    'RSI_11', 'RSI_15', 'Returns', 'Volatility', 'EMA_20', 'ATR',
+                    'MACD', 'MACD_Signal', 'ADX', 'Engulfing', 'Doji', 'buy_s', 'sell_s']
+
         self.X = self.data[features]
 
         cut = int(len(self.X) * (train_size))
@@ -149,7 +163,7 @@ class TradingStrategy:
             return score
 
         study = optuna.create_study(direction='maximize')
-        study.optimize(objective_xgb, n_trials=25)
+        study.optimize(objective_xgb, n_trials=20)
 
         # Store the best parameters
         if direction == 'buy':
@@ -237,7 +251,7 @@ class TradingStrategy:
             return score
 
         study = optuna.create_study(direction='maximize')
-        study.optimize(objective, n_trials=25)
+        study.optimize(objective, n_trials=20)
 
         # Store the best params
         if direction == 'buy':
@@ -313,16 +327,16 @@ class TradingStrategy:
 
     def _open_operation(self, operation_type, row, stop_loss, take_profit, n_shares):
         if operation_type == 'long':
-            stop_loss = row['Close'] * stop_loss
-            take_profit = row['Close'] * take_profit
+            cost = row['Close'] * n_shares * (1 + self.com)
+            if self.cash >= cost:  # Check if we have enough cash to open a long position
+                stop_loss = row['Close'] * stop_loss
+                take_profit = row['Close'] * take_profit
+                self.operations.append(Operation(operation_type, row['Close'], row.name, n_shares, stop_loss, take_profit))
+                self.cash -= cost
         else:  # 'short'
             stop_loss = row['Close'] * take_profit
             take_profit = row['Close'] * stop_loss
-
-        self.operations.append(Operation(operation_type, row['Close'], row.name, n_shares, stop_loss, take_profit))
-        if operation_type == 'long':
-            self.cash -= row['Close'] * n_shares * (1 + self.com)
-        else:  # 'short'
+            self.operations.append(Operation(operation_type, row['Close'], row.name, n_shares, stop_loss, take_profit))
             self.cash += row['Close'] * n_shares * (1 - self.com)
 
     def check_close_operations(self, row, stop_loss, take_profit, n_shares):

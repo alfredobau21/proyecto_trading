@@ -5,17 +5,20 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from xgboost import XGBClassifier
 
 class TradingStrategy:
     def __init__(self, train_path, test_path):
         self.train_data = pd.read_csv(train_path)
         self.test_data = pd.read_csv(test_path)
-        self.cash = 100000  # Inicial cash amount
+        self.cash = 100000
         self.operations = []
         self.strategy_value = [self.cash]
-        self.stop_loss = 0.85 # Change
-        self.take_profit = 1.15 # Change
-        self.n_shares = 80 # Change
+        self.stop_loss = 0.903418952201153 # Change
+        self.take_profit = 1.1315385529293625 # Change
+        self.n_shares = 50 # Change
         self.com = 0.00125
 
     def calculate_features(self, data):
@@ -45,8 +48,19 @@ class TradingStrategy:
         data['Volatility'] = data["Returns"].rolling(window=10).std()
         data['EMA_20'] = ta.trend.ema_indicator(data["Close"], window=20)
 
-        data['buy_s'] = (data.Close < data.Close.shift(-5)).astype(int)
-        data['sell_s'] = (data.Close > data.Close.shift(-5)).astype(int)
+        data['ATR'] = ta.volatility.average_true_range(data['High'], data['Low'], data['Close'])
+
+        data['MACD'] = ta.trend.macd(data['Close'])
+        data['MACD_Signal'] = ta.trend.macd_signal(data['Close'])
+
+        data['ADX'] = ta.trend.adx(data['High'], data['Low'], data['Close'])
+
+        data['Engulfing'] = np.where((data['Open'] < data['Close'].shift(1)) & (data['Close'] > data['Open'].shift(1)),
+                                     1, 0)
+        data['Doji'] = np.where(np.abs(data['Close'] - data['Open']) <= (data['High'] - data['Low']) * 0.1, 1, 0)
+
+        data['buy_s'] = (data.Close < data.Close.shift(-10)).astype(int)
+        data['sell_s'] = (data.Close > data.Close.shift(-10)).astype(int)
 
         data.dropna(inplace=True)
         data.reset_index(drop=True, inplace=True)
@@ -61,7 +75,8 @@ class TradingStrategy:
                     'Close_t11', 'Close_t12', 'Close_t13', 'Close_t14', 'Close_t15',
                     'Close_t16', 'Close_t17', 'Close_t18', 'Close_t19', 'Close_t20',
                     'Stoch_K_16', 'Stoch_K_18', 'Stoch_D_16', 'Stoch_D_18', 'RSI_10',
-                    'RSI_11', 'RSI_15', 'Returns', 'Volatility', 'EMA_20']
+                    'RSI_11', 'RSI_15', 'Returns', 'Volatility', 'EMA_20', 'ATR',
+                    'MACD', 'MACD_Signal', 'ADX', 'Engulfing', 'Doji', 'buy_s', 'sell_s']
 
         X_train = self.train_data[features]
         y_train_buy = self.train_data['buy_s']
@@ -75,7 +90,8 @@ class TradingStrategy:
         X_train_scaled = scaler.fit_transform(X_train)
         X_test_scaled = scaler.transform(X_test)
 
-        svm_buy = SVC(C=71828.51475707436, kernel='linear', max_iter=10_000)
+        # CHANGE IF YOU GET A DIFFERENT MODEL, and also chenge params
+        svm_buy = SVC(C=9.858561168648484, kernel='rbf', gamma=1.5129335462716913e-05, max_iter=50_000)
         svm_buy.fit(X_train_scaled, y_train_buy)
         y_pred_buy = svm_buy.predict(X_test_scaled)
         buy_accuracy = accuracy_score(y_test_buy, y_pred_buy)
@@ -83,7 +99,8 @@ class TradingStrategy:
         print(f'Buy Signal Accuracy: {buy_accuracy}')
         print(f'Buy Signal F1 Score: {buy_f1}')
 
-        svm_sell = SVC(C=71828.51475707436, kernel='linear', max_iter=10_000)
+        # CHANGE IF YOU GET A DIFFERENT MODEL, and also chenge params
+        svm_sell = SVC(C=24818.142277526218, kernel='linear', max_iter=50_000)
         svm_sell.fit(X_train_scaled, y_train_sell)
         y_pred_sell = svm_sell.predict(X_test_scaled)
         sell_accuracy = accuracy_score(y_test_sell, y_pred_sell)
@@ -95,6 +112,7 @@ class TradingStrategy:
         self.test_data['sell_signal'] = y_pred_sell
 
     def execute_trades(self, stop_loss=None, take_profit=None, n_shares=None):
+
         stop_loss = stop_loss or self.stop_loss
         take_profit = take_profit or self.take_profit
         n_shares = n_shares or self.n_shares
@@ -115,16 +133,16 @@ class TradingStrategy:
 
     def _open_operation(self, operation_type, row, stop_loss, take_profit, n_shares):
         if operation_type == 'long':
-            stop_loss = row['Close'] * stop_loss
-            take_profit = row['Close'] * take_profit
+            cost = row['Close'] * n_shares * (1 + self.com)
+            if self.cash >= cost:  # Check if we have enough cash to open a long position
+                stop_loss = row['Close'] * stop_loss
+                take_profit = row['Close'] * take_profit
+                self.operations.append(Operation(operation_type, row['Close'], row.name, n_shares, stop_loss, take_profit))
+                self.cash -= cost
         else:  # 'short'
             stop_loss = row['Close'] * take_profit
             take_profit = row['Close'] * stop_loss
-
-        self.operations.append(Operation(operation_type, row['Close'], row.name, n_shares, stop_loss, take_profit))
-        if operation_type == 'long':
-            self.cash -= row['Close'] * n_shares * (1 + self.com)
-        else:  # 'short'
+            self.operations.append(Operation(operation_type, row['Close'], row.name, n_shares, stop_loss, take_profit))
             self.cash += row['Close'] * n_shares * (1 - self.com)
 
     def check_close_operations(self, row, stop_loss, take_profit, n_shares):
