@@ -106,7 +106,7 @@ class TradingStrategy:
 
         self.data.reset_index(drop=True, inplace=True)
 
-    def prepare_data(self, train_size=0.75):
+    def prepare_data(self, train_size=0.80):
 
         features = ['Close_t1', 'Close_t2', 'Close_t3', 'Close_t4', 'Close_t5',
                     'Close_t6', 'Close_t7', 'Close_t8', 'Close_t9', 'Close_t10',
@@ -395,7 +395,7 @@ class TradingStrategy:
         def objective(trial):
             stop_loss_pct = trial.suggest_float('stop_loss_pct', 0.80, 0.95)
             take_profit_pct = trial.suggest_float('take_profit_pct', 1.05, 1.15)
-            n_shares = trial.suggest_int('n_shares', 50, 150)
+            n_shares = trial.suggest_int('n_shares', 80, 140)
 
             self.reset_strategy()
             self.execute_trades(best=True, stop_loss=stop_loss_pct, take_profit=take_profit_pct, n_shares=n_shares)
@@ -406,11 +406,10 @@ class TradingStrategy:
         study = optuna.create_study(direction='maximize')
         study.optimize(objective, n_trials=50)
 
-        # Mejores parámetros encontrados
+        # Best params
         best_params = study.best_params
         print(f"Best params: {best_params}")
 
-        # Aplicar los mejores parámetros a la estrategia
         self.stop_loss_pct = best_params['stop_loss_pct']
         self.take_profit_pct = best_params['take_profit_pct']
         self.n_shares = best_params['n_shares']

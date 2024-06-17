@@ -86,23 +86,17 @@ class TradingStrategy:
         y_test_buy = self.test_data['buy_s']
         y_test_sell = self.test_data['sell_s']
 
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        X_test_scaled = scaler.transform(X_test)
-
-        # CHANGE IF YOU GET A DIFFERENT MODEL, and also chenge params
-        svm_buy = SVC(C=9.858561168648484, kernel='rbf', gamma=1.5129335462716913e-05, max_iter=50_000)
-        svm_buy.fit(X_train_scaled, y_train_buy)
-        y_pred_buy = svm_buy.predict(X_test_scaled)
+        # CHANGE IF YOU GET A DIFFERENT MODEL, and also change params
+        svm_buy = SVC(C=9.858561168648484, kernel='rbf', gamma=1.5129335462716913e-05, max_iter=10_000).fit(X_train, y_train_buy)
+        y_pred_buy = svm_buy.predict(X_test)
         buy_accuracy = accuracy_score(y_test_buy, y_pred_buy)
         buy_f1 = f1_score(y_test_buy, y_pred_buy)
         print(f'Buy Signal Accuracy: {buy_accuracy}')
         print(f'Buy Signal F1 Score: {buy_f1}')
 
-        # CHANGE IF YOU GET A DIFFERENT MODEL, and also chenge params
-        svm_sell = SVC(C=24818.142277526218, kernel='linear', max_iter=50_000)
-        svm_sell.fit(X_train_scaled, y_train_sell)
-        y_pred_sell = svm_sell.predict(X_test_scaled)
+        # CHANGE IF YOU GET A DIFFERENT MODEL, and also change params
+        svm_sell = SVC(C=24818.142277526218, kernel='linear', max_iter=10_000).fit(X_train, y_train_sell)
+        y_pred_sell = svm_sell.predict(X_test)
         sell_accuracy = accuracy_score(y_test_sell, y_pred_sell)
         sell_f1 = f1_score(y_test_sell, y_pred_sell)
         print(f'Sell Signal Accuracy: {sell_accuracy}')
@@ -119,6 +113,8 @@ class TradingStrategy:
 
         self.test_data['total_buy_signals'] = self.test_data['buy_signal']
         self.test_data['total_sell_signals'] = self.test_data['sell_signal']
+
+        print(self.test_data)
 
         for i, row in self.test_data.iterrows():
             if self.test_data.total_buy_signals.iloc[i] > 0:
