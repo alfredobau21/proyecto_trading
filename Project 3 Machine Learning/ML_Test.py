@@ -16,9 +16,9 @@ class TradingStrategy:
         self.cash = 100000
         self.operations = []
         self.strategy_value = [self.cash]
-        self.stop_loss = 0.8224038701611075 # Change
-        self.take_profit = 1.0939465700462732 # Change
-        self.n_shares = 142 # Change
+        self.stop_loss = 0.9228867202180033 # Change
+        self.take_profit = 1.089737810661597 # Change
+        self.n_shares = 95 # Change
         self.com = 0.00125
 
     def calculate_features(self, data):
@@ -87,7 +87,7 @@ class TradingStrategy:
         y_test_sell = self.test_data['sell_s']
 
         # CHANGE IF YOU GET A DIFFERENT MODEL, and also change params
-        svm_buy = LogisticRegression(C=1.0589881656963537e-06, l1_ratio=0.9809825144962369, fit_intercept=False, max_iter=10_000).fit(X_train, y_train_buy)
+        svm_buy = LogisticRegression(C=2.5978068198162287e-06, l1_ratio=0.3198593978338362, fit_intercept=True, max_iter=10_000).fit(X_train, y_train_buy)
         y_pred_buy = svm_buy.predict(X_test)
         buy_accuracy = accuracy_score(y_test_buy, y_pred_buy)
         buy_f1 = f1_score(y_test_buy, y_pred_buy)
@@ -95,7 +95,7 @@ class TradingStrategy:
         print(f'Buy Signal F1 Score: {buy_f1}')
 
         # CHANGE IF YOU GET A DIFFERENT MODEL, and also change params
-        svm_sell = LogisticRegression(C=10449.15788805604, l1_ratio=0.1367154750740897, fit_intercept=True, max_iter=10_000).fit(X_train, y_train_sell)
+        svm_sell = LogisticRegression(C=44.3345092329613, l1_ratio=0.22528740018706525, fit_intercept=True, max_iter=10_000).fit(X_train, y_train_sell)
         y_pred_sell = svm_sell.predict(X_test)
         sell_accuracy = accuracy_score(y_test_sell, y_pred_sell)
         sell_f1 = f1_score(y_test_sell, y_pred_sell)
